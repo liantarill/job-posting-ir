@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}Job Search IR System — Find Your Next Job{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════
+     HERO
+══════════════════════════════════════════════ -->
+<section class="bg-white border-b border-gray-200">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+    <span class="inline-block mb-4 text-xs font-semibold tracking-widest text-brand-600 uppercase">
+      Information Retrieval
+    </span>
+    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-3">
+      Job Search Information Retrieval System
+    </h1>
+    <p class="text-base text-gray-500 mb-10">
+      Find relevant job postings using <span class="font-medium text-gray-700">TF-IDF</span> and <span class="font-medium text-gray-700">BM25</span> ranking algorithms.
+    </p>
+
+    <!-- Search form -->
+    <form id="search-form" class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-center">
+      <div class="relative flex-1">
+        <span class="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+        </span>
+        <input
+          id="query-input"
+          type="text"
+          placeholder='e.g. "software engineer Python machine learning"'
+          class="w-full pl-9 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition"
+          autocomplete="off"
+          required
+        />
+      </div>
+
+      <!-- Model selector -->
+      <select
+        id="model-select"
+        class="py-3 px-3 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400 transition bg-white cursor-pointer"
+      >
+        <option value="tfidf">TF-IDF</option>
+        <option value="bm25">BM25</option>
+      </select>
+
+      <!-- Top-K -->
+      <select
+        id="topk-select"
+        class="py-3 px-3 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-400 transition bg-white cursor-pointer"
+      >
+        <option value="5">Top 5</option>
+        <option value="10" selected>Top 10</option>
+        <option value="20">Top 20</option>
+      </select>
+
+      <button
+        id="search-btn"
+        type="submit"
+        class="px-5 py-3 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-medium text-sm rounded-lg transition-all duration-150 flex items-center gap-2 justify-center"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Search
+      </button>
+    </form>
+
+    <!-- Quick suggestions -->
+    <div class="mt-4 flex flex-wrap gap-2 justify-center text-xs">
+      <span class="text-gray-400">Try:</span>
+      {% for s in ["software engineer", "data scientist", "project manager", "marketing", "nurse", "accountant"] %}
+      <button
+        type="button"
+        onclick="quickSearch('{{ s }}')"
+        class="px-3 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-brand-400 hover:text-brand-600 transition"
+      >{{ s }}</button>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════
+     DASHBOARD STATS
+══════════════════════════════════════════════ -->
+<section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-10">
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+      <p class="text-2xl font-bold text-gray-900">{{ "{:,}".format(stats.total_jobs) }}</p>
+      <p class="text-xs text-gray-400 mt-1 font-medium uppercase tracking-wide">Total Jobs</p>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+      <p class="text-2xl font-bold text-gray-900">{{ stats.total_categories }}</p>
+      <p class="text-xs text-gray-400 mt-1 font-medium uppercase tracking-wide">Categories</p>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+      <p class="text-2xl font-bold text-brand-600">TF-IDF</p>
+      <p class="text-xs text-gray-400 mt-1 font-medium uppercase tracking-wide">Cosine Similarity</p>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-center shadow-sm">
+      <p class="text-2xl font-bold text-brand-600">BM25</p>
+      <p class="text-xs text-gray-400 mt-1 font-medium uppercase tracking-wide">Probabilistic</p>
+    </div>
+  </div>
+
+  <!-- Top categories -->
+  {% if stats.top_categories %}
+  <div class="mt-6 bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <h2 class="text-sm font-semibold text-gray-700 mb-4">Top Categories</h2>
+    <div class="space-y-2">
+      {% set max_count = stats.top_categories.values() | max %}
+      {% for cat, count in stats.top_categories.items() %}
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-600 w-48 truncate">{{ cat }}</span>
+        <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+          <div class="bg-brand-400 h-2 rounded-full transition-all duration-700"
+               style="width: {{ (count / max_count * 100) | round }}%"></div>
+        </div>
+        <span class="text-xs text-gray-400 w-10 text-right">{{ "{:,}".format(count) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<!-- ══════════════════════════════════════════════
+     RESULTS AREA
+══════════════════════════════════════════════ -->
+<section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 mb-16" id="results-section" style="display:none">
+
+  <!-- Result meta bar -->
+  <div id="result-meta" class="flex items-center justify-between mb-5">
+    <div>
+      <h2 class="text-base font-semibold text-gray-900">
+        Search results for <span id="meta-query" class="text-brand-600"></span>
+      </h2>
+      <p class="text-xs text-gray-400 mt-0.5">
+        <span id="meta-count"></span> results using <span id="meta-model" class="font-medium text-gray-600"></span>
+      </p>
+    </div>
+    <button
+      onclick="clearResults()"
+      class="text-xs text-gray-400 hover:text-gray-600 transition flex items-center gap-1"
+    >
+      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Clear
+    </button>
+  </div>
+
+  <!-- Spinner -->
+  <div id="spinner" class="hidden flex justify-center items-center py-20">
+    <div class="w-8 h-8 border-2 border-brand-200 border-t-brand-500 rounded-full animate-spin"></div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box" class="hidden bg-red-50 border border-red-200 text-red-700 rounded-xl px-5 py-4 text-sm"></div>
+
+  <!-- Cards grid -->
+  <div id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  <!-- Empty state -->
+  <div id="empty-state" class="hidden text-center py-20 text-gray-400">
+    <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <p class="text-sm">No results found. Try a different query.</p>
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════
+     ABOUT SECTION
+══════════════════════════════════════════════ -->
+<section id="about" class="bg-white border-t border-gray-200 py-14">
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h2 class="text-lg font-semibold text-gray-900 mb-6 text-center">How It Works</h2>
+    <div class="grid sm:grid-cols-2 gap-6">
+      <div class="border border-gray-200 rounded-xl p-6">
+        <h3 class="font-semibold text-sm text-gray-800 mb-2">TF-IDF + Cosine Similarity</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">
+          Term Frequency–Inverse Document Frequency weights terms by their importance in the corpus.
+          Your query is vectorised and ranked by cosine similarity against all job documents.
+        </p>
+      </div>
+      <div class="border border-gray-200 rounded-xl p-6">
+        <h3 class="font-semibold text-sm text-gray-800 mb-2">BM25 (Okapi BM25)</h3>
+        <p class="text-sm text-gray-500 leading-relaxed">
+          A probabilistic ranking function that considers term frequency, document length normalisation,
+          and an inverse document frequency weight — the standard for modern search engines.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ──────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────
+const qs = id => document.getElementById(id);
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function modelBadge(model) {
+  const cls = model === 'BM25'
+    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+    : 'bg-brand-50 text-brand-700 border border-brand-200';
+  return `<span class="text-xs font-semibold px-2 py-0.5 rounded-full ${cls}">${escapeHtml(model)}</span>`;
+}
+
+function scoreBar(score, model) {
+  // TF-IDF score is 0-1, BM25 can be much larger — normalise for display only
+  const pct = model === 'BM25' ? Math.min(score / 20 * 100, 100) : score * 100;
+  const col  = model === 'BM25' ? 'bg-amber-400' : 'bg-brand-400';
+  return `
+    <div class="flex items-center gap-2 mt-1">
+      <div class="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+        <div class="${col} h-1.5 rounded-full" style="width:${pct.toFixed(1)}%"></div>
+      </div>
+      <span class="text-xs text-gray-500 font-mono tabular-nums">${score.toFixed(4)}</span>
+    </div>`;
+}
+
+function renderCard(r) {
+  const keywords = r.keywords.length
+    ? r.keywords.map(k => `<span class="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">${escapeHtml(k)}</span>`).join('')
+    : '<span class="text-xs text-gray-400 italic">—</span>';
+
+  return `
+  <div class="fade-in bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-brand-300 transition-all duration-200 flex flex-col gap-3">
+    <div class="flex items-start justify-between gap-2">
+      <div>
+        <span class="text-xs font-medium text-gray-400">#${r.rank}</span>
+        <h3 class="text-sm font-semibold text-gray-900 leading-snug mt-0.5">${escapeHtml(r.title)}</h3>
+        <span class="inline-block mt-1 text-xs text-brand-600 font-medium bg-brand-50 px-2 py-0.5 rounded-full border border-brand-100">${escapeHtml(r.category)}</span>
+      </div>
+      ${modelBadge(r.model)}
+    </div>
+
+    <div class="flex flex-wrap gap-1.5">
+      ${keywords}
+    </div>
+
+    <p class="text-xs text-gray-500 leading-relaxed line-clamp-3 flex-1">${escapeHtml(r.description)}</p>
+
+    <div>
+      <p class="text-xs text-gray-400 mb-0.5">Relevance Score</p>
+      ${scoreBar(r.score, r.model)}
+    </div>
+  </div>`;
+}
+
+// ──────────────────────────────────────────────
+// Search
+// ──────────────────────────────────────────────
+async function doSearch(query, model, topK) {
+  // Show section
+  qs('results-section').style.display = '';
+  qs('spinner').classList.remove('hidden');
+  qs('error-box').classList.add('hidden');
+  qs('results-grid').innerHTML = '';
+  qs('empty-state').classList.add('hidden');
+
+  // Meta bar
+  qs('meta-query').textContent = `"${query}"`;
+  qs('meta-model').textContent = model.toUpperCase();
+
+  try {
+    const res = await fetch('/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, model, top_k: topK })
+    });
+
+    const data = await res.json();
+
+    qs('spinner').classList.add('hidden');
+
+    if (!res.ok) {
+      qs('error-box').textContent = data.error || 'An error occurred.';
+      qs('error-box').classList.remove('hidden');
+      qs('meta-count').textContent = '0';
+      return;
+    }
+
+    qs('meta-count').textContent = data.count;
+
+    if (data.results.length === 0) {
+      qs('empty-state').classList.remove('hidden');
+    } else {
+      qs('results-grid').innerHTML = data.results.map(renderCard).join('');
+      // Scroll to results
+      qs('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch (err) {
+    qs('spinner').classList.add('hidden');
+    qs('error-box').textContent = 'Network error. Is the server running?';
+    qs('error-box').classList.remove('hidden');
+  }
+}
+
+function quickSearch(term) {
+  qs('query-input').value = term;
+  qs('search-btn').click();
+}
+
+function clearResults() {
+  qs('results-section').style.display = 'none';
+  qs('query-input').value = '';
+  qs('query-input').focus();
+}
+
+qs('search-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const query = qs('query-input').value.trim();
+  const model = qs('model-select').value;
+  const topK  = parseInt(qs('topk-select').value, 10);
+  if (query) doSearch(query, model, topK);
+});
+</script>
+{% endblock %}

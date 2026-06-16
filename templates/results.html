@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Results for "{{ query }}" — Job Search IR{% endblock %}
+{% block description %}Job search results for "{{ query }}" using {{ model }}.{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+  <!-- Back + meta -->
+  <div class="flex items-center gap-3 mb-8">
+    <a href="/" class="text-sm text-gray-400 hover:text-brand-600 transition flex items-center gap-1">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Search
+    </a>
+    <span class="text-gray-300">|</span>
+    <h1 class="text-base font-semibold text-gray-800">
+      Results for <span class="text-brand-600">"{{ query }}"</span>
+    </h1>
+    <span class="ml-auto text-xs text-gray-400">
+      {{ results | length }} result(s) &middot;
+      <span class="font-medium text-gray-600">{{ model }}</span>
+    </span>
+  </div>
+
+  <!-- Cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for r in results %}
+    <div class="fade-in bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md hover:border-brand-300 transition-all duration-200 flex flex-col gap-3">
+
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <span class="text-xs font-medium text-gray-400">#{{ r.rank }}</span>
+          <h2 class="text-sm font-semibold text-gray-900 leading-snug mt-0.5">{{ r.title }}</h2>
+          <span class="inline-block mt-1 text-xs text-brand-600 font-medium bg-brand-50 px-2 py-0.5 rounded-full border border-brand-100">
+            {{ r.category }}
+          </span>
+        </div>
+        {% if r.model == "BM25" %}
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">BM25</span>
+        {% else %}
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">TF-IDF</span>
+        {% endif %}
+      </div>
+
+      <!-- Keywords -->
+      <div class="flex flex-wrap gap-1.5">
+        {% for kw in r.keywords %}
+        <span class="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">{{ kw }}</span>
+        {% else %}
+        <span class="text-xs text-gray-400 italic">No keywords</span>
+        {% endfor %}
+      </div>
+
+      <!-- Description preview -->
+      <p class="text-xs text-gray-500 leading-relaxed flex-1">{{ r.description }}</p>
+
+      <!-- Score -->
+      <div>
+        <p class="text-xs text-gray-400 mb-0.5">Relevance Score</p>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+            {% if r.model == "BM25" %}
+            <div class="bg-amber-400 h-1.5 rounded-full" style="width: {{ [r.score / 20 * 100, 100] | min }}%"></div>
+            {% else %}
+            <div class="bg-brand-400 h-1.5 rounded-full" style="width: {{ (r.score * 100) | round }}%"></div>
+            {% endif %}
+          </div>
+          <span class="text-xs text-gray-500 font-mono tabular-nums">{{ "%.4f" | format(r.score) }}</span>
+        </div>
+      </div>
+
+    </div>
+    {% else %}
+    <div class="col-span-full text-center py-20 text-gray-400">
+      <svg class="w-10 h-10 mx-auto mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <p class="text-sm">No results found for this query.</p>
+      <a href="/" class="mt-3 inline-block text-sm text-brand-600 hover:underline">Try a new search</a>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endblock %}
